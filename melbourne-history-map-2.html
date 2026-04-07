@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Melbourne — A Historical Guide</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #f5f0e8;
+  --text:   #2c2416;
+  --muted:  #7a6d5a;
+  --accent: #8b3a0f;
+  --accent2:#c4963b;
+  --border: #d4c8b0;
+  --panel:  #faf7f2;
+  --shadow: rgba(26,22,18,0.18);
+  --hdr:    56px;
+}
+body.dark {
+  --bg:     #111009;
+  --text:   #e8dfc8;
+  --muted:  #9a8f7a;
+  --accent: #d4763a;
+  --accent2:#c4963b;
+  --border: #2e2a22;
+  --panel:  #181510;
+  --shadow: rgba(0,0,0,0.55);
+}
+
+html, body {
+  height: 100%; width: 100%; overflow: hidden;
+  font-family: 'Lora', Georgia, serif;
+  background: var(--bg); color: var(--text);
+  transition: background 0.4s, color 0.4s;
+}
+
+/* ── HEADER ── */
+header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  height: var(--hdr);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 14px;
+  box-shadow: 0 2px 12px var(--shadow);
+  transition: background 0.4s, border-color 0.4s;
+}
+.header-left { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.site-title {
+  font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700;
+  color: var(--text); white-space: nowrap; transition: color 0.4s;
+}
+.site-sub {
+  font-size: 0.65rem; color: var(--muted); letter-spacing: 0.12em;
+  text-transform: uppercase; font-style: italic; white-space: nowrap;
+  transition: color 0.4s;
+}
+.toggle-btn {
+  display: flex; align-items: center; gap: 7px; flex-shrink: 0;
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  padding: 6px 11px; cursor: pointer; font-family: 'Lora', serif;
+  font-size: 0.73rem; color: var(--muted); letter-spacing: 0.08em;
+  text-transform: uppercase; white-space: nowrap;
+  transition: border-color 0.3s, color 0.3s, background 0.3s;
+}
+.toggle-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--bg); }
+.toggle-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* ── MAP ── */
+#map {
+  position: fixed;
+  top: var(--hdr); left: 0; right: 0; bottom: 0;
+  z-index: 1;
+}
+
+/* ── SIDE PANEL ── */
+#panel {
+  position: fixed;
+  top: var(--hdr); right: -420px; bottom: 0;
+  width: min(400px, 100vw); z-index: 900;
+  background: var(--panel); border-left: 1px solid var(--border);
+  box-shadow: -4px 0 28px var(--shadow);
+  overflow-y: auto; overflow-x: hidden;
+  transition: right 0.38s cubic-bezier(0.22,1,0.36,1), background 0.4s, border-color 0.4s;
+  -webkit-overflow-scrolling: touch;
+}
+#panel.open { right: 0; }
+
+.panel-close {
+  position: sticky; top: 0; display: flex; justify-content: flex-end;
+  padding: 11px 13px 0; background: var(--panel); z-index: 2;
+  transition: background 0.4s;
+}
+.close-btn {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 1.25rem; line-height: 1; padding: 4px 8px; border-radius: 3px;
+  transition: color 0.2s, background 0.2s;
+}
+.close-btn:hover { color: var(--accent); background: var(--border); }
+
+/* ── IMAGE AREA ── */
+.panel-img-wrap {
+  width: 100%; height: 200px; overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); transition: background 0.4s, border-color 0.4s;
+}
+.panel-img-wrap img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  filter: sepia(10%) contrast(0.95);
+  animation: fadeIn 0.5s ease;
+}
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+.img-placeholder {
+  width: 100%; height: 100%; position: relative; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  background: var(--bg);
+}
+.img-placeholder::before {
+  content: ''; position: absolute; inset: 0;
+  background-image:
+    repeating-linear-gradient(0deg, transparent, transparent 28px, var(--border) 28px, var(--border) 29px),
+    repeating-linear-gradient(90deg, transparent, transparent 28px, var(--border) 28px, var(--border) 29px);
+  opacity: 0.2;
+}
+.placeholder-ornament {
+  font-size: 2.2rem; position: relative; color: var(--accent); opacity: 0.2;
+}
+.placeholder-label {
+  position: relative; font-family: 'Lora', serif; font-size: 0.68rem;
+  letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); opacity: 0.55;
+}
+
+/* ── PANEL BODY ── */
+.panel-body { padding: 20px 24px 48px; }
+.panel-era {
+  font-size: 0.67rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 4px; transition: color 0.4s;
+}
+.panel-title {
+  font-family: 'Playfair Display', serif; font-size: 1.45rem; font-weight: 700;
+  line-height: 1.2; color: var(--text); margin-bottom: 3px; transition: color 0.4s;
+}
+.panel-subtitle {
+  font-style: italic; color: var(--muted); font-size: 0.87rem;
+  margin-bottom: 14px; transition: color 0.4s;
+}
+.cat-badge {
+  display: inline-block; font-size: 0.61rem; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 2px;
+  margin-bottom: 14px; font-family: 'Lora', serif;
+}
+.panel-divider {
+  border: none; border-top: 1px solid var(--border); margin: 16px 0;
+  transition: border-color 0.4s;
+}
+.panel-text { font-size: 0.9rem; line-height: 1.82; color: var(--text); transition: color 0.4s; }
+.panel-text p + p { margin-top: 1em; }
+.panel-fact {
+  margin-top: 18px; padding: 12px 15px; border-left: 3px solid var(--accent2);
+  background: var(--bg); border-radius: 0 4px 4px 0; font-size: 0.82rem;
+  font-style: italic; color: var(--muted); line-height: 1.65;
+  transition: background 0.4s, color 0.4s, border-color 0.4s;
+}
+
+/* ── LEGEND — horizontal strip under header, left side ── */
+#legend {
+  position: fixed;
+  top: calc(var(--hdr) + 10px);
+  left: 10px;
+  z-index: 800;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  box-shadow: 0 2px 10px var(--shadow);
+  transition: background 0.4s, border-color 0.4s;
+  max-width: 170px;
+}
+.legend-title {
+  font-family: 'Playfair Display', serif; font-size: 0.75rem; font-weight: 600;
+  color: var(--text); margin-bottom: 7px; transition: color 0.4s;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--muted); margin-bottom: 4px; font-size: 0.73rem;
+  transition: color 0.4s;
+}
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Hide legend when panel is open on narrow screens */
+@media (max-width: 520px) {
+  #panel.open ~ #legend { display: none; }
+  .site-sub { display: none; }
+}
+
+/* ── MISC ── */
+.custom-marker { cursor: pointer; }
+.leaflet-control-attribution { font-size: 9px; }
+#panel::-webkit-scrollbar { width: 4px; }
+#panel::-webkit-scrollbar-track { background: var(--bg); }
+#panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <span class="site-title">Melbourne</span>
+    <span class="site-sub">A Walking History, est. 1835</span>
+  </div>
+  <button class="toggle-btn" id="modeToggle" onclick="toggleMode()">
+    <svg id="toggleIcon" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+    <span id="toggleLabel">Night Map</span>
+  </button>
+</header>
+
+<div id="map"></div>
+
+<div id="panel">
+  <div class="panel-close">
+    <button class="close-btn" onclick="closePanel()" title="Close">&#x2715;</button>
+  </div>
+  <div id="panel-content"></div>
+</div>
+
+<div id="legend">
+  <div class="legend-title">Categories</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8b3a0f"></div>Colonial Buildings</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#2e6b4f"></div>Markets &amp; Commerce</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1a4a7a"></div>Parks &amp; Landmarks</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#6b3a7d"></div>Culture &amp; Theatre</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#7a5a1a"></div>Horse Troughs</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3a3a3a"></div>Crime &amp; Law</div>
+</div>
+
+<script>
+// ── PLACE DATA ────────────────────────────────────────────────────────────
+// wiki: exact Wikipedia page title used by the MediaWiki API (spaces as underscores)
+// null = no Wikipedia article image available
+const PLACES = [
+  { id:1,  name:"Chinatown", subtitle:"Little Bourke Street",
+    lat:-37.8113, lng:144.9644, era:"Est. 1851", category:"colonial", catLabel:"Community",
+    wiki:"Chinatown,_Melbourne",
+    body:`<p>Melbourne's Chinatown is the oldest permanent Chinese settlement in the Western world, its roots tracing to the Victorian gold rush of 1851. Thousands of Chinese prospectors arrived seeking fortune on the goldfields and many settled on Little Bourke Street after facing racial hostility in the diggings.</p><p>By the 1860s the street was a dense enclave of boarding houses, herbal medicine shops, gambling dens, and joss houses. The iconic red archways were added in 1974, but the street's bones are unmistakably nineteenth century.</p>`,
+    fact:"Anti-Chinese sentiment led to a poll tax of £10 per Chinese immigrant in 1855 and sparked riots at Buckland River and Lambing Flat. At its peak, over 40,000 Chinese migrants lived in Victoria." },
+
+  { id:2,  name:"Old Melbourne Gaol", subtitle:"Russell Street",
+    lat:-37.8079, lng:144.9657, era:"Built 1839–1864", category:"crime", catLabel:"Crime & Law",
+    wiki:"Old_Melbourne_Gaol",
+    body:`<p>Constructed in bluestone quarried by convicts, Old Melbourne Gaol is one of Australia's most significant buildings. Between 1845 and 1929, 135 men and women were hanged within its walls.</p><p>The gaol is forever tied to Ned Kelly, Australia's most notorious bushranger, hanged here on 11 November 1880. His death mask and armour remain on display. The armour — hammered from plough mould-boards — weighs 44 kilograms.</p>`,
+    fact:'"Such is life" — the last recorded words of Ned Kelly before he was hanged, though historians debate whether he actually said it.' },
+
+  { id:3,  name:"Flinders Street Station", subtitle:"Flinders & Swanston Streets",
+    lat:-37.8183, lng:144.9671, era:"Opened 1910", category:"colonial", catLabel:"Colonial Architecture",
+    wiki:"Flinders_Street_station",
+    body:`<p>The ochre-domed centrepiece of Melbourne's railway network replaced the original 1854 terminus — the first railway station in Australia. Designed by James Fawcett and H.P.C. Ashworth in an Edwardian baroque style with influences from Indian architecture.</p><p>"Under the clocks" became Melbourne's most iconic meeting point. The row of clocks above the entrance once displayed the departure time of the next train on each suburban line.</p>`,
+    fact:"A design competition was held in 1899, but the winning entries were shelved. Construction began in 1905; the main building opened in 1910 though work continued until 1919." },
+
+  { id:4,  name:"State Library of Victoria", subtitle:"Swanston Street",
+    lat:-37.8097, lng:144.9640, era:"Opened 1856", category:"colonial", catLabel:"Colonial Architecture",
+    wiki:"State_Library_Victoria",
+    body:`<p>One of the first free public libraries in the world, the State Library opened in February 1856 on land reserved by Governor La Trobe. The neoclassical bluestone building was designed by Joseph Reed, who also designed the Royal Exhibition Building.</p><p>The magnificent octagonal reading room, topped by its steel-and-glass dome, was completed in 1913. Ned Kelly's famous Jerilderie Letter — a 56-page manifesto — is held in the collection.</p>`,
+    fact:"When it opened, the library held around 3,800 volumes donated by Governor La Trobe. Today the collection exceeds two million items." },
+
+  { id:5,  name:"Royal Arcade", subtitle:"Bourke Street Mall",
+    lat:-37.8144, lng:144.9649, era:"Opened 1870", category:"colonial", catLabel:"Colonial Commerce",
+    wiki:"Royal_Arcade,_Melbourne",
+    body:`<p>Melbourne's oldest surviving shopping arcade, built in 1869–70 to designs by Charles Webb. It stretches between Bourke Street and Little Collins Street, its ornate Victorian ceiling and mosaic tile floor largely intact.</p><p>At each end stand the figures of Gog and Magog — mythological giants based on those at London's Guildhall. Each hour they raise their clubs to strike the bell of the clock. The figures were installed in 1892.</p>`,
+    fact:'The original shop leases stipulated that tenants must not operate "offensive trades" such as tallow chandlers or fish mongers.' },
+
+  { id:6,  name:"Block Arcade", subtitle:"Collins Street",
+    lat:-37.8157, lng:144.9660, era:"Opened 1892", category:"colonial", catLabel:"Colonial Commerce",
+    wiki:"Block_Arcade",
+    body:`<p>Built at the height of Marvellous Melbourne's land boom, Block Arcade is arguably the city's most beautiful interior. Designed by David C. Askew in a style inspired by Milan's Galleria Vittorio Emanuele II, with a mosaic floor imported from Italy and a glazed roof flooding the space with light.</p><p>"Doing the Block" — promenading on Collins Street between Elizabeth and Swanston — was the social ritual of Melbourne's elite in the 1880s and 90s.</p>`,
+    fact:"The distinctive hexagonal and diamond mosaic floor tiles were hand-laid by Italian craftsmen and have been carefully preserved through multiple restorations." },
+
+  { id:7,  name:"Immigration Museum", subtitle:"Old Customs House, Flinders St",
+    lat:-37.8196, lng:144.9579, era:"Built 1858", category:"colonial", catLabel:"Colonial Government",
+    wiki:"Immigration_Museum,_Melbourne",
+    body:`<p>This imposing neoclassical building served as Melbourne's Customs House for over a century, processing the extraordinary volume of goods flowing through Port Phillip during the gold rush era. Designed by Peter Kerr, completed in 1858 in local Pyalong granite.</p><p>At its peak in the 1880s, Melbourne was one of the busiest ports in the British Empire. The Long Room — now the museum's central hall — processed import duties on goods worth millions of pounds annually.</p>`,
+    fact:"The building now houses the Immigration Museum, telling the stories of the millions who have made the journey to Victoria from every corner of the globe since European settlement." },
+
+  { id:8,  name:"St Paul's Cathedral", subtitle:"Flinders & Swanston Streets",
+    lat:-37.8172, lng:144.9681, era:"Consecrated 1891", category:"colonial", catLabel:"Colonial Architecture",
+    wiki:"St_Paul's_Cathedral,_Melbourne",
+    body:`<p>Designed by William Butterfield — a leading proponent of the Victorian Gothic Revival — entirely from London without ever visiting Australia. The foundation stone was laid in 1880.</p><p>Construction spanned decades due to funding disputes. The spires were not added until 1931–32, forty years after the main structure was consecrated. The interior features elaborate tile work and stained glass.</p>`,
+    fact:"The site was originally reserved for a church in Robert Hoddle's 1837 survey — making it one of the few original survey reservations still serving its intended purpose." },
+
+  { id:9,  name:"Melbourne Town Hall", subtitle:"Swanston & Collins Streets",
+    lat:-37.8148, lng:144.9668, era:"Built 1867", category:"colonial", catLabel:"Colonial Government",
+    wiki:"Melbourne_Town_Hall",
+    body:`<p>A statement of civic ambition in sandstone and bluestone, its grand portico and clock tower dominating the Collins and Swanston corner. Completed in 1867 to designs by Joseph Reed, with extensions added in 1887 to accommodate Melbourne's explosive growth.</p><p>The Great Hall has hosted royalty, state funerals, protest meetings, boxing matches, and rock concerts. The Beatles played here in June 1964 to 5,000 screaming fans.</p>`,
+    fact:'The building sits on land that was, in Melbourne\'s earliest years, a slab-hut shantytown of pubs and boarding houses known as the "Canvas Town" overflow.' },
+
+  { id:10, name:"Parliament House", subtitle:"Spring Street",
+    lat:-37.8106, lng:144.9728, era:"Built 1856", category:"colonial", catLabel:"Colonial Government",
+    wiki:"Parliament_House,_Melbourne",
+    body:`<p>Built atop Eastern Hill with a Greek Revival colonnade of extraordinary scale. Construction began in 1856 for the newly self-governing Colony of Victoria, flush with gold-rush revenue.</p><p>The building has never been fully completed — the central dome was planned but never built. For 26 years from 1901, it served as the provisional home of the federal Parliament while Canberra was being constructed.</p>`,
+    fact:"Members of parliament were originally served alcohol at a bar built into the chamber — a tradition that proved unsurprisingly popular." },
+
+  { id:11, name:"Princess Theatre", subtitle:"Spring Street",
+    lat:-37.8099, lng:144.9729, era:"Built 1886", category:"culture", catLabel:"Culture & Theatre",
+    wiki:"Princess_Theatre,_Melbourne",
+    body:`<p>Melbourne's oldest and most ornate live theatre, a Second Empire baroque confection of cream stucco and slate mansard roofing. Designed by William Pitt in 1886, it became the premier venue for international touring productions.</p><p>The theatre is said to be haunted by Frederick Baker (Federici), a baritone who collapsed and died on stage during a performance of Faust in 1888. Staff have reported seeing him in his box, still attending performances.</p>`,
+    fact:"The original theatre on this site — Astley's Amphitheatre of 1854 — was one of Melbourne's first purpose-built entertainment venues." },
+
+  { id:12, name:"The Windsor Hotel", subtitle:"Spring Street",
+    lat:-37.8115, lng:144.9730, era:"Opened 1883", category:"colonial", catLabel:"Colonial Hospitality",
+    wiki:"The_Windsor_Hotel,_Melbourne",
+    body:`<p>Australia's only surviving nineteenth-century grand hotel in continuous operation. Opened in 1883 as the Grand Coffee Palace — a temperance hotel. Within two years a licence was granted and champagne was flowing freely.</p><p>The hotel has accommodated every Australian prime minister and numerous monarchs. The draft of the Australian Constitution was debated in its rooms during the 1898 Federal Convention.</p>`,
+    fact:'The "boom style" facade is considered one of the finest examples of Victorian commercial architecture in Australia. The spring chicken in cream sauce has been on the menu since 1883.' },
+
+  { id:13, name:"Melbourne GPO", subtitle:"Bourke & Elizabeth Streets",
+    lat:-37.8134, lng:144.9632, era:"Built 1867", category:"colonial", catLabel:"Colonial Infrastructure",
+    wiki:"General_Post_Office,_Melbourne",
+    body:`<p>The General Post Office occupied this commanding corner for over a century, its Italianate arcaded facade designed by A.E. Johnson. Completed in 1867, it was expanded and clad in Tasmanian freestone in subsequent decades.</p><p>The building served as Melbourne's communication hub during the gold rush, processing tens of thousands of letters daily from miners sending their fortunes home.</p>`,
+    fact:"During World War I the GPO was used to censor mail. Thousands of letters between Australian soldiers and their families passed through its sorting rooms." },
+
+  { id:14, name:"Flagstaff Gardens", subtitle:"William Street",
+    lat:-37.8101, lng:144.9551, era:"Est. 1840s", category:"landmark", catLabel:"Parks & Landmarks",
+    wiki:"Flagstaff_Gardens",
+    body:`<p>Occupying Melbourne's highest natural rise, Flagstaff Gardens takes its name from the signal station established here in the 1840s. A flagstaff was raised to alert colonists to the arrival of ships in Port Phillip Bay — the colony's only link to home.</p><p>The hill was also used as an unofficial burial ground in Melbourne's earliest days. Graves from the 1830s have been uncovered during various construction works.</p>`,
+    fact:'When a ship arrived with no mail, the signal became known as "hanging out the washing" — causing widespread disappointment across the colony.' },
+
+  { id:15, name:"Queen Victoria Market", subtitle:"Elizabeth & Victoria Streets",
+    lat:-37.8072, lng:144.9567, era:"Est. 1878", category:"market", catLabel:"Markets & Commerce",
+    wiki:"Queen_Victoria_Market",
+    body:`<p>Melbourne's great market stands on grounds with a complicated history — part of the site was the city's main cemetery from 1837 to 1854, with thousands of early colonists and gold-rush immigrants buried here. When the cemetery was resumed for market use, not all remains were relocated.</p><p>Trading formally began in 1878 and the market became the heartbeat of working Melbourne. The iconic western sheds, still in daily use, date from the 1880s and 90s.</p>`,
+    fact:"An estimated 9,000 people were buried in the old Melbourne General Cemetery that once occupied this site. Archaeological investigations regularly find human remains beneath the market grounds." },
+
+  { id:16, name:"Young & Jackson's Hotel", subtitle:"Flinders & Swanston Streets",
+    lat:-37.8175, lng:144.9669, era:"Est. 1861", category:"colonial", catLabel:"Colonial Hospitality",
+    wiki:"Young_&_Jackson's",
+    body:`<p>One of Melbourne's most storied pubs, Young & Jackson's has occupied this corner since 1861. The building is a handsome example of Victorian commercial architecture, though it is upstaged entirely by a painting.</p><p>Chloe — a life-size oil nude by Jules Joseph Lefebvre, shown at the Paris Salon in 1875 — caused such moral outrage at the 1880 Melbourne International Exhibition that she was removed. The pub purchased her and she has hung in the bar ever since.</p>`,
+    fact:"Chloe became a Melbourne icon and ritual farewell: soldiers heading to both World Wars drank at Y&J and toasted Chloe before departure, many never to return." },
+
+  { id:17, name:"Regent Theatre", subtitle:"Collins Street",
+    lat:-37.8147, lng:144.9654, era:"Built 1929", category:"culture", catLabel:"Culture & Theatre",
+    wiki:"Regent_Theatre,_Melbourne",
+    body:`<p>The Regent is Melbourne's great picture palace, built in 1929 to seat nearly 3,500 people in baroque splendour. The auditorium is modelled on a Mediterranean piazza under an artificial sky with twinkling stars and moving clouds.</p><p>It survived closure and demolition threats in the 1970s and 80s through community action, finally restored and reopened in 1996.</p>`,
+    fact:"The Regent's sky ceiling — complete with cloud machine — cost £50,000 in 1929. The theatre was built in less than twelve months." },
+
+  { id:18, name:"Horse Trough — Collins Street", subtitle:"Collins & King Streets",
+    lat:-37.8143, lng:144.9564, era:"Installed c. 1880s", category:"trough", catLabel:"Horse Troughs",
+    wiki:null,
+    body:`<p>Melbourne once had hundreds of granite horse troughs distributed across the city, installed by the RSPCA, municipal councils, and private benefactors. When streets were dominated by horse-drawn commerce, the troughs were essential infrastructure.</p><p>At the peak of horse-drawn transport in the 1890s, an estimated 20,000 horses worked daily in Melbourne's CBD. Each horse required 40–50 litres of water per day.</p>`,
+    fact:"The granite troughs served horses at the bottom and featured a raised section and overflow basin at the side for dogs. Many were gifts from philanthropists who believed working animals deserved public recognition." },
+
+  { id:19, name:"Horse Trough — Spring Street", subtitle:"Spring & Bourke Streets",
+    lat:-37.8118, lng:144.9724, era:"Installed c. 1875", category:"trough", catLabel:"Horse Troughs",
+    wiki:null,
+    body:`<p>Positioned near the top of Bourke Street's famous hill — a brutal climb for any draught horse hauling a loaded wagon — this trough served the thousands of animals that navigated the rise daily.</p><p>The RSPCA Victoria, founded in 1871, campaigned for troughs at strategic locations. By the 1880s, Melbourne had more horse troughs per capita than any other city in the British Empire.</p>`,
+    fact:"The Fitzroy and Collingwood hills were considered so dangerous for horses that volunteer organisations stationed men at the base to assist struggling animals. Loading limits were enforced by police." },
+
+  { id:20, name:"Horse Trough — Swanston Street", subtitle:"Near Melbourne Town Hall",
+    lat:-37.8155, lng:144.9671, era:"Installed c. 1880s", category:"trough", catLabel:"Horse Troughs",
+    wiki:null,
+    body:`<p>Swanston Street in the 1880s was a river of horse-drawn cable trams, delivery wagons, and private carriages. The cable tram system, introduced in 1885, was the largest in the world at its peak — yet still relied on horses for shunting and emergency work.</p><p>The Spring Street depot alone housed over 200 horses used as emergency backup and for shunting operations.</p>`,
+    fact:"Melbourne's cable tram network operated 592 trams on 46 miles of track at its peak. It was replaced by the electric tram system between 1925 and 1940." },
+
+  { id:21, name:"Batman's Hill Site", subtitle:"Near Spencer Street Station",
+    lat:-37.8192, lng:144.9527, era:"Est. 1835", category:"landmark", catLabel:"Parks & Landmarks",
+    wiki:"John_Batman",
+    body:`<p>Here, or very near here, John Batman first stepped ashore in June 1835 and declared "this will be the place for a village." Batman negotiated a highly controversial "treaty" with the Wurundjeri elders, trading goods for 600,000 acres of land. The British government immediately voided it.</p><p>Batman's Hill was levelled in 1859 for the construction of Spencer Street Station. The original prominent rise above the Yarra vanished entirely beneath railway infrastructure.</p>`,
+    fact:"The so-called Batman's Treaty, signed on 6 June 1835, is the only treaty ever negotiated between European settlers and Aboriginal Australians. It was immediately declared void by Governor Bourke." },
+
+  { id:22, name:"Scots Church", subtitle:"Collins & Russell Streets",
+    lat:-37.8118, lng:144.9678, era:"Built 1874", category:"colonial", catLabel:"Colonial Architecture",
+    wiki:"Scots'_Church,_Melbourne",
+    body:`<p>Completed in 1874 to designs by Joseph Reed, Scots Church is one of Melbourne's finest Gothic Revival buildings, its blue-basalt spire a familiar presence on the Collins Street skyline.</p><p>The congregation had worshipped on this site since 1838, in a series of increasingly grand buildings as the gold rush swelled both Melbourne's population and the church's coffers.</p>`,
+    fact:"The church was described by architectural critic Robin Boyd as one of the most correctly detailed Gothic buildings in Australia. The sandstone dressings were imported from Scotland." },
+
+  { id:23, name:"Burke & Wills Memorial", subtitle:"Corner Swanston & Collins Streets",
+    lat:-37.8151, lng:144.9657, era:"Unveiled 1865", category:"landmark", catLabel:"Parks & Landmarks",
+    wiki:"Burke_and_Wills_expedition",
+    body:`<p>Robert O'Hara Burke and William John Wills led the ill-fated expedition to cross Australia from south to north in 1860–61. They were the first Europeans to complete the crossing, but both perished on the return journey at Cooper Creek, just miles from a supply camp abandoned hours before their arrival.</p><p>Melbourne mourned them as heroes. Their funeral procession in 1863 drew 100,000 people — remarkable for a city of only 140,000. The bronze monument was cast in Munich.</p>`,
+    fact:"The expedition's third member, John King, survived by living with the Yandruwandha Aboriginal people for two months before rescue. Burke's leadership was widely criticised after his death." },
+
+  { id:24, name:"Cook's Cottage", subtitle:"Fitzroy Gardens",
+    lat:-37.8135, lng:144.9795, era:"Relocated 1934", category:"landmark", catLabel:"Parks & Landmarks",
+    wiki:"Cook's_Cottage",
+    body:`<p>Built in Yorkshire, England in 1755, this cottage was home to the parents of Captain James Cook. In 1934 it was dismantled brick by brick and shipped to Melbourne for Victoria's centenary celebrations. Each brick was numbered before the voyage.</p><p>Set within the Fitzroy Gardens, it is often described as the oldest building in Australia — despite being entirely English in origin.</p>`,
+    fact:"There is no confirmed evidence that Captain Cook himself ever lived in the cottage — it was his parents' home. The claim on interpretive signage has been debated by historians for decades." }
+];
+
+const CAT_COLORS  = { colonial:"#8b3a0f", market:"#2e6b4f", landmark:"#1a4a7a", culture:"#6b3a7d", trough:"#7a5a1a", crime:"#3a3a3a" };
+const CAT_SYMBOLS = { colonial:"⚜", market:"⚖", landmark:"✦", culture:"♜", trough:"⬡", crime:"⚓" };
+
+// ── WIKIPEDIA IMAGE via MediaWiki API (CORS-safe) ─────────────────────────
+const imgCache = {};
+
+async function fetchWikiImage(title) {
+  if (imgCache[title] !== undefined) return imgCache[title];
+  try {
+    const url = "https://en.wikipedia.org/w/api.php?action=query&titles="
+      + encodeURIComponent(title)
+      + "&prop=pageimages&format=json&pithumbsize=800&origin=*";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const pages = data.query.pages;
+    const page  = Object.values(pages)[0];
+    const src   = page && page.thumbnail ? page.thumbnail.source : null;
+    imgCache[title] = src;
+    return src;
+  } catch(e) {
+    console.warn("Wiki image fetch failed for", title, e);
+    imgCache[title] = null;
+    return null;
+  }
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────
+const LIGHT = "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+const DARK  = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+const ATTR  = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>';
+
+let isDark = false, tileLayer;
+
+const map = L.map("map", { center:[-37.8136, 144.9631], zoom:15, zoomControl:true });
+tileLayer = L.tileLayer(LIGHT, { attribution:ATTR, subdomains:"abcd", maxZoom:19 }).addTo(map);
+
+function makeIcon(color) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="26" height="36" viewBox="0 0 26 36">
+    <path d="M13 1C6.37 1 1 6.37 1 13c0 10.5 12 23 12 23S25 23.5 25 13C25 6.37 19.63 1 13 1z"
+      fill="${color}" stroke="rgba(255,255,255,0.45)" stroke-width="1.2"/>
+    <circle cx="13" cy="13" r="5.5" fill="rgba(255,255,255,0.85)"/>
+  </svg>`;
+  return L.divIcon({ html:svg, className:"custom-marker", iconSize:[26,36], iconAnchor:[13,36], popupAnchor:[0,-38] });
+}
+
+PLACES.forEach(p => {
+  const marker = L.marker([p.lat, p.lng], { icon: makeIcon(CAT_COLORS[p.category] || "#555") });
+  marker.bindTooltip(
+    `<b style="font-family:'Playfair Display',serif;font-size:13px">${p.name}</b>` +
+    `<br><span style="font-family:'Lora',serif;font-size:10px;color:#888;font-style:italic">${p.era}</span>`,
+    { direction:"top", offset:[0,-34] }
+  );
+  marker.on("click", () => openPanel(p));
+  marker.addTo(map);
+});
+
+// ── PANEL ─────────────────────────────────────────────────────────────────
+let activePlace = null;
+
+function renderPanel(place, imgHtml) {
+  const color  = CAT_COLORS[place.category] || "#555";
+  document.getElementById("panel-content").innerHTML =
+    `<div class="panel-img-wrap">${imgHtml}</div>
+     <div class="panel-body">
+       <div class="panel-era">${place.era}</div>
+       <h2 class="panel-title">${place.name}</h2>
+       <div class="panel-subtitle">${place.subtitle}</div>
+       <span class="cat-badge" style="background:${color}18;color:${color};border:1px solid ${color}38">${place.catLabel}</span>
+       <hr class="panel-divider">
+       <div class="panel-text">${place.body}</div>
+       ${place.fact ? `<div class="panel-fact">&#x2B21;&nbsp; ${place.fact}</div>` : ""}
+     </div>`;
+}
+
+function placeholderHtml(place, label) {
+  const symbol = CAT_SYMBOLS[place.category] || "✦";
+  return `<div class="img-placeholder">
+    <div class="placeholder-ornament">${symbol}</div>
+    <div class="placeholder-label">${label}</div>
+  </div>`;
+}
+
+async function openPanel(place) {
+  activePlace = place;
+
+  // Show instantly with loading state
+  renderPanel(place, placeholderHtml(place, "Loading…"));
+  document.getElementById("panel").classList.add("open");
+  setTimeout(() => map.invalidateSize({ animate:false }), 420);
+
+  if (!place.wiki) {
+    const wrap = document.querySelector(".panel-img-wrap");
+    if (wrap) wrap.innerHTML = placeholderHtml(place, "No photograph survives");
+    return;
+  }
+
+  const src = await fetchWikiImage(place.wiki);
+  if (activePlace !== place) return; // user opened a different pin
+  const wrap = document.querySelector(".panel-img-wrap");
+  if (!wrap) return;
+
+  if (src) {
+    const img = new Image();
+    img.onload  = () => {
+      if (activePlace !== place) return;
+      const w = document.querySelector(".panel-img-wrap");
+      if (w) w.innerHTML = `<img src="${src}" alt="${place.name}">`;
+    };
+    img.onerror = () => {
+      if (activePlace !== place) return;
+      const w = document.querySelector(".panel-img-wrap");
+      if (w) w.innerHTML = placeholderHtml(place, "No photograph survives");
+    };
+    img.src = src;
+  } else {
+    wrap.innerHTML = placeholderHtml(place, "No photograph survives");
+  }
+}
+
+function closePanel() {
+  document.getElementById("panel").classList.remove("open");
+  activePlace = null;
+  setTimeout(() => map.invalidateSize({ animate:false }), 420);
+}
+
+map.on("click", closePanel);
+
+// ── DARK MODE ─────────────────────────────────────────────────────────────
+function toggleMode() {
+  isDark = !isDark;
+  document.body.classList.toggle("dark", isDark);
+  map.removeLayer(tileLayer);
+  tileLayer = L.tileLayer(isDark ? DARK : LIGHT, { attribution:ATTR, subdomains:"abcd", maxZoom:19 }).addTo(map);
+  document.getElementById("toggleLabel").textContent = isDark ? "Day Map" : "Night Map";
+
+  const icon = document.getElementById("toggleIcon");
+  if (isDark) {
+    icon.setAttribute("fill","none"); icon.setAttribute("stroke","currentColor");
+    icon.setAttribute("stroke-width","2"); icon.setAttribute("stroke-linecap","round");
+    icon.innerHTML = `<circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+      <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
+  } else {
+    icon.setAttribute("fill","currentColor");
+    icon.removeAttribute("stroke"); icon.removeAttribute("stroke-width"); icon.removeAttribute("stroke-linecap");
+    icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+  }
+}
+</script>
+</body>
+</html>
